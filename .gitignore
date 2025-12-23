@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Optional: large raw assets (keep processed tracks instead)
+tracks_raw/

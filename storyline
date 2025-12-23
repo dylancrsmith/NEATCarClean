@@ -1,0 +1,37 @@
+Reinforecent Learning on Silverstone track
+day 1 - the idea is to make a car which can learn the best route of silverstone track. starting basic then implementing more complex variables. Today i have found a silverstone track which i the converted to binary so i can distinguish track and off track. now the car drive from the same pixels every time it starts and driving on an angel of 200 degrees along the track.
+day2 - yesterday i had the environement set up but there were a few issues. The car was spinning in circles since the reward system wasnt optimised. I thought to make a script which allows me to click on the track and get the coordinates so i can set checkpoints which will be a reward system for lil fella to hit. Recap over, im going to try make the reward system good
+end of day 2- watching a video with similar intentions, found they are using a NEAT system instead of RL. going to look into it.
+day4- ive decided instead of tryinf to patch up my old reinforment learning approach to make it fit im going to restart my whole project keeping the track only.
+end of day4 -Today I refined the NEAT car racing setup, making the simulation loop stable and efficient. I cleaned up car_env_neat.py, added culling for slow agents, and ensured cars keep moving until they crash instead of idling. I fixed a crash caused by max() when all cars died by restructuring alive-car tracking, and tuned car.py for smoother acceleration, speed, and sensor range. The system now runs cleanly across generations with clear progress tracking. Main issues left are reward tuning and balancing speed for more consistent full-track driving.
+Today I went back into my older version of the project because I wanted to add improvements I thought would push the learning further — things like extra sensors, a better reward system, new collision logic, and more control outputs.
+
+But instead of improving it, everything basically collapsed.
+
+I kept trying to “upgrade” little parts (collision, rotation logic, sensor directions, reward shaping, NEAT outputs, new actions) without realising how connected everything was.
+Changing one thing broke three others. Then trying to fix those broke even more.
+
+Eventually:
+
+Cars stopped moving properly
+
+Collision became inconsistent
+
+NEAT wouldn’t run
+
+Reward system made no sense
+
+Config files went out of sync
+
+My NEAT library was a weird broken fork
+
+The environment loop kept crashing
+
+The entire project became unfixable
+
+At that point I realised the project wasn’t “bad” — it was just built on too many patches.
+Nothing was clean anymore.
+
+So Day 5 was mostly the realisation that the old version couldn’t be saved in a clean way.
+Trying to fix it just caused more breakage.
+It taught me that sometimes restarting from a clean base is faster than trying to repair a tangled mess.
