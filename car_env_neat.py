@@ -8,9 +8,6 @@ from track_config import TRACK_CONFIG  # ✅ unified config
 FPS = 60
 TRACKS_DIR = "tracks"
 
-TRACK_NAME = "DriveIt_clean.png"
-TRACK_PATH = os.path.join(TRACKS_DIR, TRACK_NAME)
-
 # =========================
 # Reward shaping (minimal)
 # =========================
@@ -30,13 +27,13 @@ MAX_FRAMES = FPS * 30
 
 
 class CarEnv:
-    def __init__(self):
+    def __init__(self, track_name="DriveIt_clean.png"):
         pygame.init()
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("NEAT Car Env")
 
-        # load track
-        self.track = pygame.image.load(TRACK_PATH).convert()
+        track_path = os.path.join(TRACKS_DIR, track_name)
+        self.track = pygame.image.load(track_path).convert()
         self.track = pygame.transform.scale(self.track, (WIDTH, HEIGHT))
 
         self.clock = pygame.time.Clock()
@@ -46,7 +43,7 @@ class CarEnv:
         # =========================
         # Load spawn + finish from config
         # =========================
-        cfg = TRACK_CONFIG.get(TRACK_NAME)
+        cfg = TRACK_CONFIG.get(track_name)
 
         if cfg is None:
             print("⚠ No TRACK_CONFIG entry for this track. Using defaults.")

@@ -159,5 +159,13 @@ class Car:
     # =====================================================================
     #                           DRAW
     # =====================================================================
-    def draw(self, screen):
+    def draw(self, screen, draw_sensors=False):
+        if draw_sensors:
+            cx, cy = int(self.x), int(self.y)
+            for i, rel in enumerate(self.sensor_angles):
+                ang = math.radians(self.angle + rel)
+                dist = self.sensor_readings[i]
+                end_x = int(cx + math.cos(ang) * dist)
+                end_y = int(cy + math.sin(ang) * dist)
+                pygame.draw.line(screen, (0, 200, 255), (cx, cy), (end_x, end_y), 1)
         screen.blit(self.rotated, self.rect.topleft)
