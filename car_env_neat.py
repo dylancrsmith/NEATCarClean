@@ -13,7 +13,7 @@ TRACKS_DIR = "tracks"
 # =========================
 DISTANCE_REWARD = 0.5           # fitness per pixel for non-finishers (progress signal)
 FINISH_BONUS = 10000            # base bonus just for finishing
-TIME_REWARD = 20                # fitness per frame remaining when finished (speed incentive)
+TIME_SCALE = 500                # divisor for quadratic time reward
 
 MAX_FRAMES = FPS * 120          # 2 minute hard cap
 
@@ -126,7 +126,7 @@ class CarEnv:
 
                 if car.left_start and self.is_finished(car):
                     frames_remaining = MAX_FRAMES - car.time_alive
-                    ge[i].fitness = FINISH_BONUS + frames_remaining * TIME_REWARD
+                    ge[i].fitness = FINISH_BONUS + (frames_remaining ** 2) // TIME_SCALE
                     if self.best_finish_time is None or car.time_alive < self.best_finish_time:
                         self.best_finish_time = car.time_alive
                     car.alive = False
