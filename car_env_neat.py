@@ -117,8 +117,10 @@ class CarEnv:
 
                 car.update(self.track)
 
+                # update fitness every frame so cars always have a signal to follow
+                ge[i].fitness = car.distance * DISTANCE_REWARD
+
                 if not car.alive:
-                    ge[i].fitness = car.distance * DISTANCE_REWARD
                     continue
 
                 if not car.left_start and not self.start_rect.collidepoint(int(car.x), int(car.y)):
