@@ -9,23 +9,18 @@ FPS = 60
 TRACKS_DIR = "tracks"
 
 # =========================
-# Reward shaping (minimal)
+# Reward shaping
 # =========================
-PER_FRAME_SPEED_REWARD = 0.01   # small encouragement to move
-CRASH_PENALTY = 50              # mild exploration penalty
-MIN_SPEED = 1.5                 # cars slower than this for too long get culled
-MIN_SPEED_GRACE = 90            # frames of grace before slow cull kicks in (1.5s)
+DISTANCE_REWARD = 0.1           # reward per pixel travelled
+FINISH_BONUS = 5000             # bonus for completing a lap
+PB_BONUS = 10000                # extra bonus for a new best lap time
+PB_BONUS_PER_FRAME = 20         # extra per frame faster than old best
 
-# Finish rewards (main objective)
-FINISH_BASE_REWARD = 3000               # finishing is always good
-FINISH_SLOW_REWARD = 1500               # finished but not a PB
+# Stagnation cull — kill cars that stop making progress
+STAGNATION_FRAMES = 90          # check every N frames
+STAGNATION_MIN_DIST = 30        # must have moved at least this many pixels
 
-# ✅ BIG “personal best” reward logic
-PB_BASE_REWARD = 15000                  # major reward if new best time
-PB_BONUS_PER_FRAME = 30                 # extra per frame faster than old best
-
-# Optional cap
-MAX_FRAMES = FPS * 30
+MAX_FRAMES = FPS * 60           # 60s hard cap per generation
 
 
 class CarEnv:
@@ -95,7 +90,7 @@ class CarEnv:
             car = Car(self.spawn_x, self.spawn_y, self.spawn_angle)
             car.speed = 1.0
             car.left_start = False
-            car.slow_frames = 0   # counter for slow-speed cull
+            car.last_check_dist = 0.0   # distance at last stagnation check
 
             cars.append(car)
 
@@ -120,15 +115,13 @@ class CarEnv:
                     car.alive = False
                     continue
 
-                # slow car cull — kill cars that crawl after the grace period
-                if car.time_alive > MIN_SPEED_GRACE:
-                    if car.speed < MIN_SPEED:
-                        car.slow_frames += 1
-                        if car.slow_frames > 60:
-                            car.alive = False
-                            continue
-                    else:
-                        car.slow_frames = 0
+                # stagnation cull — kill cars not making progress
+                if car.time_alive % STAGNATION_FRAMES == 0 and car.time_alive > 0:
+                    dist_gained = car.distance - car.last_check_dist
+                    if dist_gained < STAGNATION_MIN_DIST:
+                        car.alive = False
+                        continue
+                    car.last_check_dist = car.distance
 
                 # INPUTS
                 inputs = car.get_inputs()
@@ -136,13 +129,11 @@ class CarEnv:
                 # OUTPUTS = [steer, throttle]
                 steer, throttle = nets[i].activate(inputs)
 
-                # Steering
                 if steer > 0.3:
                     car.steer_right()
                 elif steer < -0.3:
                     car.steer_left()
 
-                # Throttle
                 if throttle > 0.2:
                     car.accelerate()
                 else:
@@ -150,39 +141,29 @@ class CarEnv:
 
                 car.update(self.track)
 
-                # crashed?
+                # crashed — fitness is whatever distance they reached
                 if not car.alive:
-                    ge[i].fitness -= CRASH_PENALTY
+                    ge[i].fitness = car.distance * DISTANCE_REWARD
                     continue
 
-                # tiny per-frame reward (doesn't dominate)
-                ge[i].fitness += car.speed * PER_FRAME_SPEED_REWARD
-
-                # ✅ mark when the car has truly left the spawn zone
+                # mark when car leaves spawn zone
                 if not car.left_start and not self.start_rect.collidepoint(int(car.x), int(car.y)):
                     car.left_start = True
 
-                # FINISH CHECK (only after leaving start)
+                # finish check (only after leaving start)
                 if car.left_start and self.is_finished(car):
-                    finish_time = car.time_alive  # frames to finish
+                    finish_time = car.time_alive
 
-                    # always reward finishing
-                    ge[i].fitness += FINISH_BASE_REWARD
+                    ge[i].fitness = car.distance * DISTANCE_REWARD + FINISH_BONUS
 
                     if self.best_finish_time is None:
-                        # first ever finish sets baseline (treat as PB)
                         self.best_finish_time = finish_time
-                        ge[i].fitness += PB_BASE_REWARD
+                        ge[i].fitness += PB_BONUS
                     else:
                         improvement = self.best_finish_time - finish_time
-
                         if improvement > 0:
-                            # ✅ MAJOR reward for new best time
-                            ge[i].fitness += PB_BASE_REWARD + improvement * PB_BONUS_PER_FRAME
+                            ge[i].fitness += PB_BONUS + improvement * PB_BONUS_PER_FRAME
                             self.best_finish_time = finish_time
-                        else:
-                            # finished but slower than PB
-                            ge[i].fitness += FINISH_SLOW_REWARD
 
                     car.alive = False
                     continue

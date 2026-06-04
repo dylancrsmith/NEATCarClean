@@ -112,9 +112,9 @@ class Car:
         if px < 0 or px >= WIDTH or py < 0 or py >= HEIGHT:
             return True
 
-        # pixel check — treat any dark pixel as a wall (catches anti-aliased edges)
+        # pixel check — dark pixel = wall (threshold catches anti-aliased edges)
         pixel = track_surf.get_at((px, py))[:3]
-        return sum(pixel) < 200
+        return sum(pixel) < 384
 
     # =====================================================================
     #                           SENSORS
