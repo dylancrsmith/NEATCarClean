@@ -141,9 +141,11 @@ class CarEnv:
 
                 car.update(self.track)
 
-                # crashed — fitness is whatever distance they reached
+                # update fitness every frame so time-capped cars aren't penalised
+                ge[i].fitness = car.distance * DISTANCE_REWARD
+
+                # crashed
                 if not car.alive:
-                    ge[i].fitness = car.distance * DISTANCE_REWARD
                     continue
 
                 # mark when car leaves spawn zone
@@ -154,7 +156,7 @@ class CarEnv:
                 if car.left_start and self.is_finished(car):
                     finish_time = car.time_alive
 
-                    ge[i].fitness = car.distance * DISTANCE_REWARD + FINISH_BONUS
+                    ge[i].fitness += FINISH_BONUS
 
                     if self.best_finish_time is None:
                         self.best_finish_time = finish_time

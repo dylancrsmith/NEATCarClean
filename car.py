@@ -40,7 +40,7 @@ class Car:
         self.turn_rate = 3.0
 
         # sensors
-        self.sensor_angles = [-60, -30, -15, 0, 15, 30, 60]
+        self.sensor_angles = [-90, -60, -30, -15, 0, 15, 30, 60, 90]
         self.sensor_readings = [MAX_SENSOR_DIST] * len(self.sensor_angles)
 
         # state
