@@ -8,8 +8,8 @@ HEIGHT = 770
 CAR_W = 8
 CAR_H = 8
 
-WALL_THRESHOLD = 384           # sum of RGB below this = wall pixel
-MAX_SENSOR_DIST = 300
+BORDER_COLOR = (0, 0, 0)       # black = off track
+MAX_SENSOR_DIST = 350
 
 
 class Car:
@@ -30,13 +30,13 @@ class Car:
 
         # movement
         self.speed = 1.0
-        self.max_speed = 5.0
-        self.acceleration = 0.15
-        self.deceleration = 0.12
-        self.turn_rate = 3.5
+        self.max_speed = 3.0
+        self.acceleration = 0.12
+        self.deceleration = 0.08
+        self.turn_rate = 3.0
 
-        # sensors — 9 directions including 90-degree sides
-        self.sensor_angles = [-90, -60, -30, -15, 0, 15, 30, 60, 90]
+        # sensors
+        self.sensor_angles = [-60, -30, -15, 0, 15, 30, 60]
         self.sensor_readings = [MAX_SENSOR_DIST] * len(self.sensor_angles)
 
         self.alive = True
@@ -48,8 +48,7 @@ class Car:
         if not self.alive:
             return
 
-        # NO minimum speed floor — let the car actually brake for corners
-        self.speed = max(self.speed, 0.0)
+        self.speed = max(self.speed, 0.8)
 
         rad = math.radians(self.angle)
         self.x += math.cos(rad) * self.speed
@@ -85,7 +84,7 @@ class Car:
         self.speed = min(self.speed + self.acceleration, self.max_speed)
 
     def brake(self):
-        self.speed = max(self.speed - self.deceleration, 0.0)
+        self.speed = max(self.speed - self.deceleration, 0)
 
     # =====================================================================
     #                           COLLISION
@@ -98,7 +97,7 @@ class Car:
             return True
 
         pixel = track_surf.get_at((px, py))[:3]
-        return sum(pixel) < WALL_THRESHOLD
+        return pixel == BORDER_COLOR
 
     # =====================================================================
     #                           SENSORS
@@ -122,7 +121,7 @@ class Car:
                 if ix < 0 or ix >= WIDTH or iy < 0 or iy >= HEIGHT:
                     break
 
-                if sum(track_surf.get_at((ix, iy))[:3]) < WALL_THRESHOLD:
+                if track_surf.get_at((ix, iy))[:3] == BORDER_COLOR:
                     break
 
             self.sensor_readings.append(dist)
@@ -131,10 +130,7 @@ class Car:
     #                           NEAT INPUTS
     # =====================================================================
     def get_inputs(self):
-        # 9 scaled sensor distances + current speed = 10 inputs
-        inputs = [d / MAX_SENSOR_DIST for d in self.sensor_readings]
-        inputs.append(self.speed / self.max_speed)
-        return inputs
+        return [d / MAX_SENSOR_DIST for d in self.sensor_readings]
 
     # =====================================================================
     #                           DRAW

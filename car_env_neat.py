@@ -3,7 +3,7 @@ import pygame
 import neat
 
 from car import Car, WIDTH, HEIGHT
-from track_config import TRACK_CONFIG  # ✅ unified config
+from track_config import TRACK_CONFIG
 
 FPS = 60
 TRACKS_DIR = "tracks"
@@ -11,16 +11,16 @@ TRACKS_DIR = "tracks"
 # =========================
 # Reward shaping
 # =========================
-DISTANCE_REWARD = 0.1           # reward per pixel travelled
-FINISH_BONUS = 5000             # bonus for completing a lap
-PB_BONUS = 10000                # extra bonus for a new best lap time
-PB_BONUS_PER_FRAME = 20         # extra per frame faster than old best
+PER_FRAME_SPEED_REWARD = 0.05
+CRASH_PENALTY = 50
 
-# Stagnation cull — kill cars that stop making progress
-STAGNATION_FRAMES = 60          # check every N frames (every 1s)
-STAGNATION_MIN_DIST = 60        # must have moved at least this many pixels
+FINISH_BASE_REWARD = 3000
+FINISH_SLOW_REWARD = 1500
 
-MAX_FRAMES = FPS * 60           # 60s hard cap per generation
+PB_BASE_REWARD = 15000
+PB_BONUS_PER_FRAME = 30
+
+MAX_FRAMES = FPS * 30
 
 
 class CarEnv:
@@ -37,13 +37,10 @@ class CarEnv:
         self.font = pygame.font.SysFont("consolas", 20)
         self.generation = 0
 
-        # =========================
-        # Load spawn + finish from config
-        # =========================
         cfg = TRACK_CONFIG.get(track_name)
 
         if cfg is None:
-            print("⚠ No TRACK_CONFIG entry for this track. Using defaults.")
+            print(f"No TRACK_CONFIG entry for {track_name}. Run track_selector.py first.")
             self.spawn_x = WIDTH // 2
             self.spawn_y = HEIGHT // 2
             self.spawn_angle = 0
@@ -51,27 +48,17 @@ class CarEnv:
         else:
             sp = cfg.get("spawn", {"x": WIDTH // 2, "y": HEIGHT // 2, "angle": 0})
             fn = cfg.get("finish", {"x": WIDTH // 2, "y": HEIGHT // 2, "w": 60, "h": 60})
-
             self.spawn_x = sp["x"]
             self.spawn_y = sp["y"]
             self.spawn_angle = sp["angle"]
             self.finish_rect = pygame.Rect(fn["x"], fn["y"], fn["w"], fn["h"])
 
-        # BEST LAP TIME (frames) seen so far
         self.best_finish_time = None
-
-        # Optional: start gating (prevents “finish right next to spawn” cheating)
         self.start_rect = pygame.Rect(self.spawn_x - 60, self.spawn_y - 60, 120, 120)
 
-    # =====================================================================
-    #                           FINISH DETECTION
-    # =====================================================================
     def is_finished(self, car: Car) -> bool:
         return self.finish_rect.collidepoint(int(car.x), int(car.y))
 
-    # =====================================================================
-    #                           EVALUATION
-    # =====================================================================
     def eval_genomes(self, genomes, config):
         self.generation += 1
 
@@ -79,19 +66,14 @@ class CarEnv:
         cars = []
         ge = []
 
-        # create cars
         for _, genome in genomes:
             genome.fitness = 0.0
             ge.append(genome)
-
             net = neat.nn.FeedForwardNetwork.create(genome, config)
             nets.append(net)
-
             car = Car(self.spawn_x, self.spawn_y, self.spawn_angle)
             car.speed = 1.0
             car.left_start = False
-            car.last_check_dist = 0.0   # distance at last stagnation check
-
             cars.append(car)
 
         while True:
@@ -110,23 +92,11 @@ class CarEnv:
 
                 alive += 1
 
-                # hard cap
-                if MAX_FRAMES is not None and car.time_alive >= MAX_FRAMES:
+                if car.time_alive >= MAX_FRAMES:
                     car.alive = False
                     continue
 
-                # stagnation cull — kill cars not making progress
-                if car.time_alive % STAGNATION_FRAMES == 0 and car.time_alive > 0:
-                    dist_gained = car.distance - car.last_check_dist
-                    if dist_gained < STAGNATION_MIN_DIST:
-                        car.alive = False
-                        continue
-                    car.last_check_dist = car.distance
-
-                # INPUTS
                 inputs = car.get_inputs()
-
-                # OUTPUTS = [steer, throttle]
                 steer, throttle = nets[i].activate(inputs)
 
                 if steer > 0.3:
@@ -141,56 +111,46 @@ class CarEnv:
 
                 car.update(self.track)
 
-                # update fitness every frame so time-capped cars aren't penalised
-                ge[i].fitness = car.distance * DISTANCE_REWARD
-
-                # crashed
                 if not car.alive:
+                    ge[i].fitness -= CRASH_PENALTY
                     continue
 
-                # mark when car leaves spawn zone
+                ge[i].fitness += car.speed * PER_FRAME_SPEED_REWARD
+
                 if not car.left_start and not self.start_rect.collidepoint(int(car.x), int(car.y)):
                     car.left_start = True
 
-                # finish check (only after leaving start)
                 if car.left_start and self.is_finished(car):
                     finish_time = car.time_alive
-
-                    ge[i].fitness += FINISH_BONUS
+                    ge[i].fitness += FINISH_BASE_REWARD
 
                     if self.best_finish_time is None:
                         self.best_finish_time = finish_time
-                        ge[i].fitness += PB_BONUS
+                        ge[i].fitness += PB_BASE_REWARD
                     else:
                         improvement = self.best_finish_time - finish_time
                         if improvement > 0:
-                            ge[i].fitness += PB_BONUS + improvement * PB_BONUS_PER_FRAME
+                            ge[i].fitness += PB_BASE_REWARD + improvement * PB_BONUS_PER_FRAME
                             self.best_finish_time = finish_time
+                        else:
+                            ge[i].fitness += FINISH_SLOW_REWARD
 
                     car.alive = False
-                    continue
 
             if alive == 0:
                 break
 
             self.render(cars)
 
-    # =====================================================================
-    #                              RENDER
-    # =====================================================================
     def render(self, cars):
         self.screen.blit(self.track, (0, 0))
-
-        # finish rect
         pygame.draw.rect(self.screen, (255, 0, 0), self.finish_rect, 2)
-
 
         for car in cars:
             if car.alive:
                 car.draw(self.screen)
 
         best_txt = "None" if self.best_finish_time is None else str(self.best_finish_time)
-        text = self.font.render(f"Gen {self.generation} | BestFinish(frames): {best_txt}", True, (255, 255, 255))
+        text = self.font.render(f"Gen {self.generation} | Best: {best_txt} frames", True, (255, 255, 255))
         self.screen.blit(text, (10, 10))
-
         pygame.display.flip()
