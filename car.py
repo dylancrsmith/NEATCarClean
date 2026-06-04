@@ -8,19 +8,17 @@ HEIGHT = 770
 CAR_W = 8
 CAR_H = 8
 
-BORDER_COLOR = (0, 0, 0)       # black = off track
-MAX_SENSOR_DIST = 350          # tuned for stability
+WALL_THRESHOLD = 384           # sum of RGB below this = wall pixel
+MAX_SENSOR_DIST = 300
 
 
 class Car:
     def __init__(self, x, y, angle=0):
-        # simple green sprite (old behaviour style)
         base = pygame.Surface((CAR_W, CAR_H), pygame.SRCALPHA)
         base.fill((0, 255, 0))
         self.sprite = base
         self.rotated = base
 
-        # position
         self.x = float(x)
         self.y = float(y)
         self.angle = float(angle)
@@ -30,60 +28,48 @@ class Car:
         self.last_x = self.x
         self.last_y = self.y
 
-
-
         # movement
         self.speed = 1.0
-        self.max_speed = 3.0
-        self.acceleration = 0.12
-        self.deceleration = 0.08
-        self.turn_rate = 3.0
+        self.max_speed = 5.0
+        self.acceleration = 0.15
+        self.deceleration = 0.12
+        self.turn_rate = 3.5
 
-        # sensors
+        # sensors — 9 directions including 90-degree sides
         self.sensor_angles = [-90, -60, -30, -15, 0, 15, 30, 60, 90]
         self.sensor_readings = [MAX_SENSOR_DIST] * len(self.sensor_angles)
 
-        # state
         self.alive = True
 
     # =====================================================================
     #                          MAIN UPDATE
     # =====================================================================
     def update(self, track_surf):
-
         if not self.alive:
             return
-        
-        self.speed = max(self.speed, 0.8)
 
-        # ------- move -------
+        # NO minimum speed floor — let the car actually brake for corners
+        self.speed = max(self.speed, 0.0)
+
         rad = math.radians(self.angle)
         self.x += math.cos(rad) * self.speed
         self.y += math.sin(rad) * self.speed
 
         dx = self.x - self.last_x
         dy = self.y - self.last_y
-        step_dist = math.hypot(dx, dy)
-
-        self.distance += step_dist
+        self.distance += math.hypot(dx, dy)
         self.time_alive += 1
-
         self.last_x = self.x
         self.last_y = self.y
 
-
-
-        # rotate sprite
         self.rotated = pygame.transform.rotate(self.sprite, -self.angle)
         self.rect = self.rotated.get_rect(center=(self.x, self.y))
 
-        # strict collision (old working version)
         if self._hits_wall(track_surf):
             self.alive = False
             self.speed = 0
             return
 
-        # sensors
         self._update_sensors(track_surf)
 
     # =====================================================================
@@ -99,7 +85,7 @@ class Car:
         self.speed = min(self.speed + self.acceleration, self.max_speed)
 
     def brake(self):
-        self.speed = max(self.speed - self.deceleration, 0)
+        self.speed = max(self.speed - self.deceleration, 0.0)
 
     # =====================================================================
     #                           COLLISION
@@ -108,13 +94,11 @@ class Car:
         px = int(self.x)
         py = int(self.y)
 
-        # out of bounds
         if px < 0 or px >= WIDTH or py < 0 or py >= HEIGHT:
             return True
 
-        # pixel check — dark pixel = wall (threshold catches anti-aliased edges)
         pixel = track_surf.get_at((px, py))[:3]
-        return sum(pixel) < 384
+        return sum(pixel) < WALL_THRESHOLD
 
     # =====================================================================
     #                           SENSORS
@@ -138,7 +122,7 @@ class Car:
                 if ix < 0 or ix >= WIDTH or iy < 0 or iy >= HEIGHT:
                     break
 
-                if track_surf.get_at((ix, iy))[:3] == BORDER_COLOR:
+                if sum(track_surf.get_at((ix, iy))[:3]) < WALL_THRESHOLD:
                     break
 
             self.sensor_readings.append(dist)
@@ -147,14 +131,10 @@ class Car:
     #                           NEAT INPUTS
     # =====================================================================
     def get_inputs(self):
-        # returns 7 scaled distances
-        return [d / MAX_SENSOR_DIST for d in self.sensor_readings]
-
-    # =====================================================================
-    #                           REWARD
-    # =====================================================================
-    def get_reward(self):
-        return self.speed  # simple + stable
+        # 9 scaled sensor distances + current speed = 10 inputs
+        inputs = [d / MAX_SENSOR_DIST for d in self.sensor_readings]
+        inputs.append(self.speed / self.max_speed)
+        return inputs
 
     # =====================================================================
     #                           DRAW
