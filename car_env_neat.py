@@ -11,8 +11,10 @@ TRACKS_DIR = "tracks"
 # =========================
 # Reward shaping (minimal)
 # =========================
-PER_FRAME_SPEED_REWARD = 0.05   # tiny encouragement to move
+PER_FRAME_SPEED_REWARD = 0.01   # small encouragement to move
 CRASH_PENALTY = 50              # mild exploration penalty
+MIN_SPEED = 1.5                 # cars slower than this for too long get culled
+MIN_SPEED_GRACE = 90            # frames of grace before slow cull kicks in (1.5s)
 
 # Finish rewards (main objective)
 FINISH_BASE_REWARD = 3000               # finishing is always good
@@ -92,9 +94,8 @@ class CarEnv:
 
             car = Car(self.spawn_x, self.spawn_y, self.spawn_angle)
             car.speed = 1.0
-
-            # ✅ must leave start area before finish counts (prevents instant finish)
             car.left_start = False
+            car.slow_frames = 0   # counter for slow-speed cull
 
             cars.append(car)
 
@@ -118,6 +119,16 @@ class CarEnv:
                 if MAX_FRAMES is not None and car.time_alive >= MAX_FRAMES:
                     car.alive = False
                     continue
+
+                # slow car cull — kill cars that crawl after the grace period
+                if car.time_alive > MIN_SPEED_GRACE:
+                    if car.speed < MIN_SPEED:
+                        car.slow_frames += 1
+                        if car.slow_frames > 60:
+                            car.alive = False
+                            continue
+                    else:
+                        car.slow_frames = 0
 
                 # INPUTS
                 inputs = car.get_inputs()
@@ -190,8 +201,6 @@ class CarEnv:
         # finish rect
         pygame.draw.rect(self.screen, (255, 0, 0), self.finish_rect, 2)
 
-        # start rect (debug only; remove later if you want)
-        pygame.draw.rect(self.screen, (0, 120, 255), self.start_rect, 2)
 
         for car in cars:
             if car.alive:
