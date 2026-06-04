@@ -17,8 +17,8 @@ PB_BONUS = 10000                # extra bonus for a new best lap time
 PB_BONUS_PER_FRAME = 20         # extra per frame faster than old best
 
 # Stagnation cull — kill cars that stop making progress
-STAGNATION_FRAMES = 90          # check every N frames
-STAGNATION_MIN_DIST = 30        # must have moved at least this many pixels
+STAGNATION_FRAMES = 60          # check every N frames (every 1s)
+STAGNATION_MIN_DIST = 60        # must have moved at least this many pixels
 
 MAX_FRAMES = FPS * 60           # 60s hard cap per generation
 
