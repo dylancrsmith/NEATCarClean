@@ -74,6 +74,8 @@ class CarEnv:
             car = Car(self.spawn_x, self.spawn_y, self.spawn_angle)
             car.speed = 1.0
             car.left_start = False
+            car.last_checkpoint_dist = 0.0
+            car.last_checkpoint_frame = 0
             cars.append(car)
 
         while True:
@@ -96,10 +98,13 @@ class CarEnv:
                     car.alive = False
                     continue
 
-                # kill slow cars after grace period
-                if car.time_alive > 120 and car.speed < 1.0:
-                    car.alive = False
-                    continue
+                # kill cars not making distance progress (every 90 frames, must have moved 40px)
+                if car.time_alive - car.last_checkpoint_frame >= 90:
+                    if car.distance - car.last_checkpoint_dist < 40:
+                        car.alive = False
+                        continue
+                    car.last_checkpoint_dist = car.distance
+                    car.last_checkpoint_frame = car.time_alive
 
                 inputs = car.get_inputs()
                 steer, throttle = nets[i].activate(inputs)
