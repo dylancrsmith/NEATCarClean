@@ -20,7 +20,7 @@ FINISH_SLOW_REWARD = 1500
 PB_BASE_REWARD = 15000
 PB_BONUS_PER_FRAME = 30
 
-MAX_FRAMES = FPS * 30
+MAX_FRAMES = FPS * 120  # 2 minute hard cap (stagnation check handles stuck cars)
 
 
 class CarEnv:
