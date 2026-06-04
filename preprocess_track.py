@@ -54,8 +54,9 @@ def preprocess_track(filename):
     kernel = np.ones((5, 5), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations=1)
 
-    # Convert 1-channel mask to 3-channel image
-    final_img = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+    # Resize to sim resolution using nearest-neighbour (preserves pure black/white)
+    final_img = cv2.resize(mask, (1440, 770), interpolation=cv2.INTER_NEAREST)
+    final_img = cv2.cvtColor(final_img, cv2.COLOR_GRAY2BGR)
 
     out_name = filename.replace(".png", "_clean.png")
     out_path = os.path.join(OUT_DIR, out_name)
