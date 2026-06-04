@@ -11,16 +11,11 @@ TRACKS_DIR = "tracks"
 # =========================
 # Reward shaping
 # =========================
-PER_FRAME_SPEED_REWARD = 0.05
-CRASH_PENALTY = 50
+DISTANCE_REWARD = 0.5           # fitness per pixel for non-finishers (progress signal)
+FINISH_BONUS = 10000            # base bonus just for finishing
+TIME_REWARD = 20                # fitness per frame remaining when finished (speed incentive)
 
-FINISH_BASE_REWARD = 3000
-FINISH_SLOW_REWARD = 1500
-
-PB_BASE_REWARD = 15000
-PB_BONUS_PER_FRAME = 30
-
-MAX_FRAMES = FPS * 120  # 2 minute hard cap (stagnation check handles stuck cars)
+MAX_FRAMES = FPS * 120          # 2 minute hard cap
 
 
 class CarEnv:
@@ -95,6 +90,7 @@ class CarEnv:
                 alive += 1
 
                 if car.time_alive >= MAX_FRAMES:
+                    ge[i].fitness = car.distance * DISTANCE_REWARD
                     car.alive = False
                     continue
 
@@ -122,29 +118,17 @@ class CarEnv:
                 car.update(self.track)
 
                 if not car.alive:
-                    ge[i].fitness -= CRASH_PENALTY
+                    ge[i].fitness = car.distance * DISTANCE_REWARD
                     continue
-
-                ge[i].fitness += car.speed * PER_FRAME_SPEED_REWARD
 
                 if not car.left_start and not self.start_rect.collidepoint(int(car.x), int(car.y)):
                     car.left_start = True
 
                 if car.left_start and self.is_finished(car):
-                    finish_time = car.time_alive
-                    ge[i].fitness += FINISH_BASE_REWARD
-
-                    if self.best_finish_time is None:
-                        self.best_finish_time = finish_time
-                        ge[i].fitness += PB_BASE_REWARD
-                    else:
-                        improvement = self.best_finish_time - finish_time
-                        if improvement > 0:
-                            ge[i].fitness += PB_BASE_REWARD + improvement * PB_BONUS_PER_FRAME
-                            self.best_finish_time = finish_time
-                        else:
-                            ge[i].fitness += FINISH_SLOW_REWARD
-
+                    frames_remaining = MAX_FRAMES - car.time_alive
+                    ge[i].fitness = FINISH_BONUS + frames_remaining * TIME_REWARD
+                    if self.best_finish_time is None or car.time_alive < self.best_finish_time:
+                        self.best_finish_time = car.time_alive
                     car.alive = False
 
             if alive == 0:
