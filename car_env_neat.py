@@ -96,6 +96,11 @@ class CarEnv:
                     car.alive = False
                     continue
 
+                # kill slow cars after grace period
+                if car.time_alive > 120 and car.speed < 1.0:
+                    car.alive = False
+                    continue
+
                 inputs = car.get_inputs()
                 steer, throttle = nets[i].activate(inputs)
 
